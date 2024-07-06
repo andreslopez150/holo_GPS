@@ -1,3 +1,5 @@
+import bluetooth 
+import threading
 import cv2
 import matplotlib.pyplot as plt
 import time 
@@ -5,6 +7,50 @@ from luma.core.interface.serial import i2c
 from luma.oled.device import sh1107
 from PIL import Image
 
+
+
+
+# Función para inicializar la conexión Bluetooth
+def iniciar_servidor_bluetooth():
+    server_sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM) 
+    port = 1  # Puedes cambiar el puerto si lo necesitas
+    server_sock.bind(("", port)) 
+    server_sock.listen(1) 
+    print("Esperando conexión Bluetooth...")
+    client_sock, address = server_sock.accept() 
+    print("Conexión realizada con:", address) 
+    return server_sock, client_sock
+
+# Función para recibir coordenadas por Bluetooth en un hilo separado
+def recibir_coordenadas(client_sock):
+    coordenadas = []
+    while True:
+        data = client_sock.recv(1024)
+        if not data:
+            print("Cliente desconectado.")
+            break
+        # Suponiendo que recibimos las coordenadas en formato "x,y"
+        coordenada = data.decode().split(",")
+        if len(coordenada) == 2:
+            try:
+                x = float(coordenada[0])
+                y = float(coordenada[1])
+                coordenadas.append([x, y])
+                imprimir_coordenada(coordenadas)
+                print("Coordenada recibida:", x, y)
+            except ValueError:
+                print("Formato de coordenadas inválido:", data.decode())
+
+
+
+
+# Crear un hilo para recibir coordenadas por Bluetooth
+
+        # Hacer algo con las coordenadas recibidas, como procesarlas o mostrarlas
+server_sock, client_sock = iniciar_servidor_bluetooth()
+# Iniciar el hilo para recibir coordenadas
+hilo_recepcion = threading.Thread(target=recibir_coordenadas)
+hilo_recepcion.start()
 #serial = i2c(port=1, address=0x3C)
 
 # Inicializar la pantalla OLED SH1107
@@ -20,7 +66,7 @@ y1 = 38.9974780467993
 y0 = 38.9688989737754
 x0 = -3.95215840741489
 
-# Tamaño del área a recortar
+# Tamaño del área a recortarcv2
 area_size = 128
 
 # Resolución del mapa en términos de píxeles por longitud y píxeles por latitud
@@ -34,27 +80,6 @@ alto_y = abs(y1 - y0)
 pixel_por_grado_x = sizeX / ancho_x
 pixel_por_grado_y = sizeY / alto_y
 
-# Lista de coordenadas a iterar
-coordenadas = [
-    [-3.927655, 38.995411],
-[-3.927592, 38.99573],
-[-3.927676, 38.995855],
-[-3.927767, 38.995905],
-[-3.927653, 38.995977],
-[-3.927645, 38.996067],
-[-3.927728, 38.996145],
-[-3.927828, 38.996158],
-[-3.927962, 38.996069],
-[-3.927944, 38.995962],
-[-3.92787, 38.995913],
-[-3.927991, 38.995757],
-[-3.928005, 38.995682],
-[-3.92782, 38.995162],
-[-3.927885, 38.99443],
-[-3.927954, 38.992465],
-[-3.928056, 38.99133]
-]
-
 # Abrir la imagen con OpenCV
 image_path = "imagen_procesada.png"
 image = cv2.imread(image_path)
@@ -63,12 +88,10 @@ image = cv2.imread(image_path)
 color = (0, 0, 255)  # Rojo en este caso
 thickness = -1  # Para rellenar el círculo
 
-# Crear una única figura y eje
-fig, ax = plt.subplots()
 
 # Iterar sobre las coordenadas y realizar la operación en cada posición
-for coord in coordenadas:
-    x, y = coord
+def imprimir_coordenadas(coordenadas):
+    x, y = coordenadas
 
     # Diferencia en coordenadas X e Y
     diferencia_x = abs(x - x0)
@@ -99,9 +122,7 @@ for coord in coordenadas:
     # Mostrar el área recortada
     cv2.imshow('Frame completo', area_recortada)
     
-    key = cv2.waitKey(30)
-    if key == ord('q'):
-        break
+    
     """ax.imshow(cv2.cvtColor(area_recortada, cv2.COLOR_BGR2RGB))
     ax.set_title(f"Coordenada: ({x}, {y})")
     plt.draw()  # Actualizar la ventana de visualización
